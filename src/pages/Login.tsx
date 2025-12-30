@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Flame, Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -17,12 +17,25 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
-  const { login, register, isAuthenticated } = useHabits();
+  const { login, register, isAuthenticated, isLoading } = useHabits();
   const navigate = useNavigate();
 
-  if (isAuthenticated) {
-    navigate('/', { replace: true });
-    return null;
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          className="h-8 w-8 border-2 border-primary/30 border-t-primary rounded-full"
+        />
+      </div>
+    );
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,26 +43,42 @@ export default function Login() {
     setLoading(true);
 
     try {
-      let success: boolean;
+      let result: { error: string | null };
       
       if (isLogin) {
-        success = await login(email, password);
+        result = await login(email, password);
       } else {
-        success = await register(name, email, password);
+        if (password.length < 6) {
+          toast({
+            title: "Password too short",
+            description: "Password must be at least 6 characters.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+        result = await register(name, email, password);
       }
 
-      if (success) {
+      if (result.error) {
+        let message = result.error;
+        if (result.error.includes('User already registered')) {
+          message = 'An account with this email already exists. Try signing in instead.';
+        } else if (result.error.includes('Invalid login credentials')) {
+          message = 'Invalid email or password. Please try again.';
+        }
+        
+        toast({
+          title: "Error",
+          description: message,
+          variant: "destructive",
+        });
+      } else {
         toast({
           title: isLogin ? "Welcome back!" : "Account created!",
           description: "Let's track some habits.",
         });
-        navigate('/');
-      } else {
-        toast({
-          title: "Error",
-          description: "Please check your credentials and try again.",
-          variant: "destructive",
-        });
+        navigate('/dashboard');
       }
     } catch (error) {
       toast({

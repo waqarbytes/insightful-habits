@@ -9,7 +9,7 @@ import { AddHabitDialog } from '@/components/habits/AddHabitDialog';
 import { useHabits } from '@/context/HabitContext';
 
 export default function Dashboard() {
-  const { user, getAllHabitsWithStats, getTotalStreak, getCompletionRate, habits } = useHabits();
+  const { user, profile, getAllHabitsWithStats, getTotalStreak, getCompletionRate, habits } = useHabits();
   const habitsWithStats = getAllHabitsWithStats();
   const streak = getTotalStreak();
   const completionRate = getCompletionRate();
@@ -27,7 +27,7 @@ export default function Dashboard() {
         >
           <div>
             <h1 className="text-2xl lg:text-3xl font-bold text-foreground">
-              Good {getGreeting()}, {user?.name?.split(' ')[0] || 'there'}! 👋
+              Good {getGreeting()}, {profile?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'there'}!
             </h1>
             <p className="text-muted-foreground mt-1">
               {getMotivationalMessage(todayCompleted, habits.length)}

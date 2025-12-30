@@ -12,7 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
 export default function Profile() {
-  const { user, logout, getAllHabitsWithStats, getCompletionRate, getTotalStreak, habits, logs } = useHabits();
+  const { user, profile, logout, getAllHabitsWithStats, getCompletionRate, getTotalStreak, habits, logs } = useHabits();
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
 
@@ -56,11 +56,11 @@ export default function Profile() {
               </div>
               
               <div className="flex-1">
-                <h2 className="text-xl font-bold text-foreground">{user?.name}</h2>
+                <h2 className="text-xl font-bold text-foreground">{profile?.name || user?.email?.split('@')[0]}</h2>
                 <p className="text-muted-foreground">{user?.email}</p>
                 <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4" />
-                  <span>Joined {user?.joinedAt ? format(new Date(user.joinedAt), 'MMMM yyyy') : 'recently'}</span>
+                  <span>Joined {user?.created_at ? format(new Date(user.created_at), 'MMMM yyyy') : 'recently'}</span>
                 </div>
               </div>
 
@@ -116,7 +116,7 @@ export default function Profile() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Name</Label>
-                  <Input id="name" defaultValue={user?.name} />
+                  <Input id="name" defaultValue={profile?.name || ''} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
