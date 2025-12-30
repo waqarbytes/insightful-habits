@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { StreakIndicator } from '@/components/habits/StreakIndicator';
 
 const navItems = [
-  { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/habits', icon: Target, label: 'My Habits' },
   { path: '/analytics', icon: BarChart3, label: 'Analytics' },
   { path: '/profile', icon: User, label: 'Profile' },
@@ -27,7 +27,7 @@ const navItems = [
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const { user, logout, getTotalStreak } = useHabits();
+  const { user, profile, logout, getTotalStreak } = useHabits();
   const streak = getTotalStreak();
 
   return (
@@ -130,7 +130,7 @@ export function Sidebar() {
                 exit={{ opacity: 0 }}
                 className="flex-1 min-w-0"
               >
-                <p className="font-medium text-sm text-foreground truncate">{user.name}</p>
+                <p className="font-medium text-sm text-foreground truncate">{profile?.name || user.email?.split('@')[0]}</p>
                 <p className="text-xs text-muted-foreground truncate">{user.email}</p>
               </motion.div>
             )}

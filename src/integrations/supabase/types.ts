@@ -14,7 +14,116 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      habit_logs: {
+        Row: {
+          created_at: string
+          date: string
+          habit_id: string
+          id: string
+          note: string | null
+          user_id: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          habit_id: string
+          id?: string
+          note?: string | null
+          user_id: string
+          value?: number
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          habit_id?: string
+          id?: string
+          note?: string | null
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "habit_logs_habit_id_fkey"
+            columns: ["habit_id"]
+            isOneToOne: false
+            referencedRelation: "habits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      habits: {
+        Row: {
+          category: Database["public"]["Enums"]["habit_category"]
+          color: string
+          created_at: string
+          description: string | null
+          frequency: string
+          icon: string
+          id: string
+          name: string
+          target: number
+          unit: Database["public"]["Enums"]["habit_unit"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["habit_category"]
+          color?: string
+          created_at?: string
+          description?: string | null
+          frequency?: string
+          icon?: string
+          id?: string
+          name: string
+          target?: number
+          unit?: Database["public"]["Enums"]["habit_unit"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["habit_category"]
+          color?: string
+          created_at?: string
+          description?: string | null
+          frequency?: string
+          icon?: string
+          id?: string
+          name?: string
+          target?: number
+          unit?: Database["public"]["Enums"]["habit_unit"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          id: string
+          name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +132,21 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      habit_category:
+        | "health"
+        | "fitness"
+        | "mindfulness"
+        | "productivity"
+        | "learning"
+        | "social"
+      habit_unit:
+        | "times"
+        | "minutes"
+        | "hours"
+        | "glasses"
+        | "steps"
+        | "pages"
+        | "custom"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +273,24 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      habit_category: [
+        "health",
+        "fitness",
+        "mindfulness",
+        "productivity",
+        "learning",
+        "social",
+      ],
+      habit_unit: [
+        "times",
+        "minutes",
+        "hours",
+        "glasses",
+        "steps",
+        "pages",
+        "custom",
+      ],
+    },
   },
 } as const

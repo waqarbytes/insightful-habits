@@ -1,26 +1,31 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 import { Habit, HabitLog, HabitWithStats, WeeklyTrend, CategoryStats, HabitCategory } from '@/types/habit';
 
-interface User {
+interface Profile {
   id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  joinedAt: Date;
+  user_id: string;
+  name: string | null;
+  avatar_url: string | null;
+  created_at: string;
 }
 
 interface HabitContextType {
   user: User | null;
+  profile: Profile | null;
+  session: Session | null;
   habits: Habit[];
   logs: HabitLog[];
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
-  register: (name: string, email: string, password: string) => Promise<boolean>;
-  addHabit: (habit: Omit<Habit, 'id' | 'createdAt'>) => void;
-  updateHabit: (id: string, updates: Partial<Habit>) => void;
-  deleteHabit: (id: string) => void;
-  logHabit: (habitId: string, value: number, note?: string) => void;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<{ error: string | null }>;
+  logout: () => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<{ error: string | null }>;
+  addHabit: (habit: Omit<Habit, 'id' | 'createdAt'>) => Promise<void>;
+  updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>;
+  deleteHabit: (id: string) => Promise<void>;
+  logHabit: (habitId: string, value: number, note?: string) => Promise<void>;
   getHabitWithStats: (habitId: string) => HabitWithStats | null;
   getAllHabitsWithStats: () => HabitWithStats[];
   getWeeklyTrends: () => WeeklyTrend[];
@@ -31,194 +36,264 @@ interface HabitContextType {
 
 const HabitContext = createContext<HabitContextType | undefined>(undefined);
 
-const defaultHabits: Habit[] = [
-  {
-    id: '1',
-    name: 'Drink Water',
-    description: 'Stay hydrated throughout the day',
-    category: 'health',
-    icon: 'Droplets',
-    color: '#0EA5E9',
-    target: 8,
-    unit: 'glasses',
-    frequency: 'daily',
-    createdAt: new Date('2024-01-01'),
-  },
-  {
-    id: '2',
-    name: 'Morning Exercise',
-    description: '30 minutes of physical activity',
-    category: 'fitness',
-    icon: 'Dumbbell',
-    color: '#10B981',
-    target: 30,
-    unit: 'minutes',
-    frequency: 'daily',
-    createdAt: new Date('2024-01-01'),
-  },
-  {
-    id: '3',
-    name: 'Meditation',
-    description: 'Mindfulness and calm',
-    category: 'mindfulness',
-    icon: 'Brain',
-    color: '#8B5CF6',
-    target: 15,
-    unit: 'minutes',
-    frequency: 'daily',
-    createdAt: new Date('2024-01-01'),
-  },
-  {
-    id: '4',
-    name: 'Read',
-    description: 'Read books or articles',
-    category: 'learning',
-    icon: 'BookOpen',
-    color: '#F59E0B',
-    target: 20,
-    unit: 'pages',
-    frequency: 'daily',
-    createdAt: new Date('2024-01-01'),
-  },
-  {
-    id: '5',
-    name: 'Sleep 8 Hours',
-    description: 'Get quality rest',
-    category: 'health',
-    icon: 'Moon',
-    color: '#6366F1',
-    target: 8,
-    unit: 'hours',
-    frequency: 'daily',
-    createdAt: new Date('2024-01-01'),
-  },
-];
-
-const generateMockLogs = (habits: Habit[]): HabitLog[] => {
-  const logs: HabitLog[] = [];
-  const today = new Date();
-  
-  habits.forEach(habit => {
-    for (let i = 0; i < 30; i++) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      
-      const shouldComplete = Math.random() > 0.2;
-      if (shouldComplete) {
-        const completionRate = 0.6 + Math.random() * 0.5;
-        logs.push({
-          id: `${habit.id}-${i}`,
-          habitId: habit.id,
-          value: Math.floor(habit.target * completionRate),
-          date,
-        });
-      }
-    }
-  });
-  
-  return logs;
-};
-
 export function HabitProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('habitUser');
-    return saved ? JSON.parse(saved) : null;
-  });
-  
-  const [habits, setHabits] = useState<Habit[]>(() => {
-    const saved = localStorage.getItem('habits');
-    return saved ? JSON.parse(saved) : defaultHabits;
-  });
-  
-  const [logs, setLogs] = useState<HabitLog[]>(() => {
-    const saved = localStorage.getItem('habitLogs');
-    if (saved) return JSON.parse(saved);
-    return generateMockLogs(defaultHabits);
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [logs, setLogs] = useState<HabitLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Fetch profile data
+  const fetchProfile = useCallback(async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (!error && data) {
+      setProfile(data as Profile);
+    }
+  }, []);
+
+  // Fetch habits data
+  const fetchHabits = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('habits')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (!error && data) {
+      setHabits(data.map((h: any) => ({
+        id: h.id,
+        name: h.name,
+        description: h.description,
+        category: h.category as HabitCategory,
+        icon: h.icon,
+        color: h.color,
+        target: h.target,
+        unit: h.unit,
+        frequency: h.frequency,
+        createdAt: new Date(h.created_at),
+      })));
+    }
+  }, []);
+
+  // Fetch logs data
+  const fetchLogs = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('habit_logs')
+      .select('*')
+      .order('date', { ascending: false });
+    
+    if (!error && data) {
+      setLogs(data.map((l: any) => ({
+        id: l.id,
+        habitId: l.habit_id,
+        value: l.value,
+        date: new Date(l.date),
+        note: l.note,
+      })));
+    }
+  }, []);
+
+  // Initialize auth state
   useEffect(() => {
-    if (user) localStorage.setItem('habitUser', JSON.stringify(user));
-    else localStorage.removeItem('habitUser');
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Defer data fetching with setTimeout
+        if (session?.user) {
+          setTimeout(() => {
+            fetchProfile(session.user.id);
+            fetchHabits();
+            fetchLogs();
+          }, 0);
+        } else {
+          setProfile(null);
+          setHabits([]);
+          setLogs([]);
+        }
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchProfile(session.user.id);
+        fetchHabits();
+        fetchLogs();
+      }
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [fetchProfile, fetchHabits, fetchLogs]);
+
+  const login = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    if (error) {
+      return { error: error.message };
+    }
+    return { error: null };
+  }, []);
+
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    setProfile(null);
+    setHabits([]);
+    setLogs([]);
+  }, []);
+
+  const register = useCallback(async (name: string, email: string, password: string): Promise<{ error: string | null }> => {
+    const redirectUrl = `${window.location.origin}/`;
+    
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectUrl,
+        data: {
+          name,
+        },
+      },
+    });
+    
+    if (error) {
+      return { error: error.message };
+    }
+    return { error: null };
+  }, []);
+
+  const addHabit = useCallback(async (habit: Omit<Habit, 'id' | 'createdAt'>) => {
+    if (!user) return;
+    
+    const { data, error } = await supabase
+      .from('habits')
+      .insert({
+        user_id: user.id,
+        name: habit.name,
+        description: habit.description,
+        category: habit.category,
+        icon: habit.icon,
+        color: habit.color,
+        target: habit.target,
+        unit: habit.unit,
+        frequency: habit.frequency,
+      })
+      .select()
+      .single();
+    
+    if (!error && data) {
+      const newHabit: Habit = {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        category: data.category as HabitCategory,
+        icon: data.icon,
+        color: data.color,
+        target: data.target,
+        unit: data.unit,
+        frequency: data.frequency as 'daily' | 'weekly',
+        createdAt: new Date(data.created_at),
+      };
+      setHabits(prev => [newHabit, ...prev]);
+    }
   }, [user]);
 
-  useEffect(() => {
-    localStorage.setItem('habits', JSON.stringify(habits));
-  }, [habits]);
+  const updateHabit = useCallback(async (id: string, updates: Partial<Habit>) => {
+    const dbUpdates: Record<string, any> = {};
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.category !== undefined) dbUpdates.category = updates.category;
+    if (updates.icon !== undefined) dbUpdates.icon = updates.icon;
+    if (updates.color !== undefined) dbUpdates.color = updates.color;
+    if (updates.target !== undefined) dbUpdates.target = updates.target;
+    if (updates.unit !== undefined) dbUpdates.unit = updates.unit;
+    if (updates.frequency !== undefined) dbUpdates.frequency = updates.frequency;
 
-  useEffect(() => {
-    localStorage.setItem('habitLogs', JSON.stringify(logs));
-  }, [logs]);
-
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
-    if (email && password.length >= 6) {
-      setUser({
-        id: '1',
-        name: email.split('@')[0],
-        email,
-        joinedAt: new Date(),
-      });
-      return true;
-    }
-    return false;
-  }, []);
-
-  const logout = useCallback(() => {
-    setUser(null);
-  }, []);
-
-  const register = useCallback(async (name: string, email: string, password: string): Promise<boolean> => {
-    if (name && email && password.length >= 6) {
-      setUser({
-        id: '1',
-        name,
-        email,
-        joinedAt: new Date(),
-      });
-      return true;
-    }
-    return false;
-  }, []);
-
-  const addHabit = useCallback((habit: Omit<Habit, 'id' | 'createdAt'>) => {
-    const newHabit: Habit = {
-      ...habit,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-    };
-    setHabits(prev => [...prev, newHabit]);
-  }, []);
-
-  const updateHabit = useCallback((id: string, updates: Partial<Habit>) => {
-    setHabits(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
-  }, []);
-
-  const deleteHabit = useCallback((id: string) => {
-    setHabits(prev => prev.filter(h => h.id !== id));
-    setLogs(prev => prev.filter(l => l.habitId !== id));
-  }, []);
-
-  const logHabit = useCallback((habitId: string, value: number, note?: string) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { error } = await supabase
+      .from('habits')
+      .update(dbUpdates)
+      .eq('id', id);
     
+    if (!error) {
+      setHabits(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
+    }
+  }, []);
+
+  const deleteHabit = useCallback(async (id: string) => {
+    const { error } = await supabase
+      .from('habits')
+      .delete()
+      .eq('id', id);
+    
+    if (!error) {
+      setHabits(prev => prev.filter(h => h.id !== id));
+      setLogs(prev => prev.filter(l => l.habitId !== id));
+    }
+  }, []);
+
+  const logHabit = useCallback(async (habitId: string, value: number, note?: string) => {
+    if (!user) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Check if log exists for today
     const existingLog = logs.find(
-      l => l.habitId === habitId && new Date(l.date).toDateString() === today.toDateString()
+      l => l.habitId === habitId && l.date.toISOString().split('T')[0] === today
     );
     
     if (existingLog) {
-      setLogs(prev => prev.map(l => 
-        l.id === existingLog.id ? { ...l, value, note } : l
-      ));
+      // Update existing log
+      const { error } = await supabase
+        .from('habit_logs')
+        .update({ value, note })
+        .eq('id', existingLog.id);
+      
+      if (!error) {
+        setLogs(prev => prev.map(l => 
+          l.id === existingLog.id ? { ...l, value, note } : l
+        ));
+      }
     } else {
-      setLogs(prev => [...prev, {
-        id: Date.now().toString(),
-        habitId,
-        value,
-        date: today,
-        note,
-      }]);
+      // Create new log
+      const { data, error } = await supabase
+        .from('habit_logs')
+        .insert({
+          user_id: user.id,
+          habit_id: habitId,
+          value,
+          date: today,
+          note,
+        })
+        .select()
+        .single();
+      
+      if (!error && data) {
+        setLogs(prev => [...prev, {
+          id: data.id,
+          habitId: data.habit_id,
+          value: data.value,
+          date: new Date(data.date),
+          note: data.note,
+        }]);
+      }
     }
-  }, [logs]);
+  }, [user, logs]);
 
   const getHabitWithStats = useCallback((habitId: string): HabitWithStats | null => {
     const habit = habits.find(h => h.id === habitId);
@@ -336,9 +411,12 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
   return (
     <HabitContext.Provider value={{
       user,
+      profile,
+      session,
       habits,
       logs,
-      isAuthenticated: !!user,
+      isAuthenticated: !!session,
+      isLoading,
       login,
       logout,
       register,
