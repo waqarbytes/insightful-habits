@@ -9,6 +9,11 @@ interface Profile {
   name: string | null;
   avatar_url: string | null;
   created_at: string;
+  notifications_enabled?: boolean;
+  onboarding_completed?: boolean;
+  date_of_birth?: string;
+  wake_up_time?: string;
+  bed_time?: string;
 }
 
 interface HabitContextType {
@@ -19,9 +24,11 @@ interface HabitContextType {
   logs: HabitLog[];
   isAuthenticated: boolean;
   isLoading: boolean;
+  isAppExiting: boolean;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<{ error: string | null }>;
+  updateProfile: (updates: Partial<Profile>) => Promise<{ error: string | null }>;
   addHabit: (habit: Omit<Habit, 'id' | 'createdAt'>) => Promise<void>;
   updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>;
   deleteHabit: (id: string) => Promise<void>;
@@ -32,6 +39,7 @@ interface HabitContextType {
   getCategoryStats: () => CategoryStats[];
   getTotalStreak: () => number;
   getCompletionRate: () => number;
+  uploadAvatar: (file: File) => Promise<{ error: string | null }>;
 }
 
 const HabitContext = createContext<HabitContextType | undefined>(undefined);
@@ -43,6 +51,7 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [logs, setLogs] = useState<HabitLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAppExiting, setIsAppExiting] = useState(false);
 
   // Fetch profile data
   const fetchProfile = useCallback(async (userId: string) => {
@@ -51,7 +60,7 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
-    
+
     if (!error && data) {
       setProfile(data as Profile);
     }
@@ -63,7 +72,7 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
       .from('habits')
       .select('*')
       .order('created_at', { ascending: false });
-    
+
     if (!error && data) {
       setHabits(data.map((h: any) => ({
         id: h.id,
@@ -86,7 +95,7 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
       .from('habit_logs')
       .select('*')
       .order('date', { ascending: false });
-    
+
     if (!error && data) {
       setLogs(data.map((l: any) => ({
         id: l.id,
@@ -105,7 +114,7 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         // Defer data fetching with setTimeout
         if (session?.user) {
           setTimeout(() => {
@@ -125,7 +134,7 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         fetchProfile(session.user.id);
         fetchHabits();
@@ -142,7 +151,7 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
       email,
       password,
     });
-    
+
     if (error) {
       return { error: error.message };
     }
@@ -150,17 +159,22 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    setIsAppExiting(true);
+    // Wait for animation to finish
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
     setProfile(null);
     setHabits([]);
     setLogs([]);
+    setIsAppExiting(false);
   }, []);
 
   const register = useCallback(async (name: string, email: string, password: string): Promise<{ error: string | null }> => {
     const redirectUrl = `${window.location.origin}/`;
-    
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -171,16 +185,32 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
         },
       },
     });
-    
+
     if (error) {
       return { error: error.message };
     }
     return { error: null };
   }, []);
 
+  const updateProfile = useCallback(async (updates: Partial<Profile>): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'No user' };
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('user_id', user.id);
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    setProfile(prev => prev ? { ...prev, ...updates } : null);
+    return { error: null };
+  }, [user]);
+
   const addHabit = useCallback(async (habit: Omit<Habit, 'id' | 'createdAt'>) => {
     if (!user) return;
-    
+
     const { data, error } = await supabase
       .from('habits')
       .insert({
@@ -196,7 +226,7 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
       })
       .select()
       .single();
-    
+
     if (!error && data) {
       const newHabit: Habit = {
         id: data.id,
@@ -229,7 +259,7 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
       .from('habits')
       .update(dbUpdates)
       .eq('id', id);
-    
+
     if (!error) {
       setHabits(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
     }
@@ -240,7 +270,7 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
       .from('habits')
       .delete()
       .eq('id', id);
-    
+
     if (!error) {
       setHabits(prev => prev.filter(h => h.id !== id));
       setLogs(prev => prev.filter(l => l.habitId !== id));
@@ -249,23 +279,23 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
 
   const logHabit = useCallback(async (habitId: string, value: number, note?: string) => {
     if (!user) return;
-    
+
     const today = new Date().toISOString().split('T')[0];
-    
+
     // Check if log exists for today
     const existingLog = logs.find(
       l => l.habitId === habitId && l.date.toISOString().split('T')[0] === today
     );
-    
+
     if (existingLog) {
       // Update existing log
       const { error } = await supabase
         .from('habit_logs')
         .update({ value, note })
         .eq('id', existingLog.id);
-      
+
       if (!error) {
-        setLogs(prev => prev.map(l => 
+        setLogs(prev => prev.map(l =>
           l.id === existingLog.id ? { ...l, value, note } : l
         ));
       }
@@ -282,7 +312,7 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
         })
         .select()
         .single();
-      
+
       if (!error && data) {
         setLogs(prev => [...prev, {
           id: data.id,
@@ -302,22 +332,22 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
     const habitLogs = logs.filter(l => l.habitId === habitId);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    const todayLog = habitLogs.find(l => 
+
+    const todayLog = habitLogs.find(l =>
       new Date(l.date).toDateString() === today.toDateString()
     );
 
     let currentStreak = 0;
     let longestStreak = 0;
     let tempStreak = 0;
-    
+
     for (let i = 0; i < 365; i++) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
-      const log = habitLogs.find(l => 
+      const log = habitLogs.find(l =>
         new Date(l.date).toDateString() === date.toDateString() && l.value >= habit.target
       );
-      
+
       if (log) {
         tempStreak++;
         if (i === 0 || currentStreak > 0) currentStreak = tempStreak;
@@ -355,21 +385,21 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
     const trends: WeeklyTrend[] = [];
     const today = new Date();
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    
+
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       date.setHours(0, 0, 0, 0);
-      
-      const dayLogs = logs.filter(l => 
+
+      const dayLogs = logs.filter(l =>
         new Date(l.date).toDateString() === date.toDateString()
       );
-      
+
       const completed = dayLogs.filter(l => {
         const habit = habits.find(h => h.id === l.habitId);
         return habit && l.value >= habit.target;
       }).length;
-      
+
       trends.push({
         day: days[date.getDay()],
         completed,
@@ -377,22 +407,22 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
         rate: habits.length > 0 ? (completed / habits.length) * 100 : 0,
       });
     }
-    
+
     return trends;
   }, [logs, habits]);
 
   const getCategoryStats = useCallback((): CategoryStats[] => {
     const categories: HabitCategory[] = ['health', 'fitness', 'mindfulness', 'productivity', 'learning', 'social'];
-    
+
     return categories.map(category => {
       const categoryHabits = habits.filter(h => h.category === category);
       const avgCompletion = categoryHabits.length > 0
         ? categoryHabits.reduce((sum, h) => {
-            const stats = getHabitWithStats(h.id);
-            return sum + (stats?.completionRate || 0);
-          }, 0) / categoryHabits.length
+          const stats = getHabitWithStats(h.id);
+          return sum + (stats?.completionRate || 0);
+        }, 0) / categoryHabits.length
         : 0;
-      
+
       return { category, count: categoryHabits.length, avgCompletion };
     }).filter(c => c.count > 0);
   }, [habits, getHabitWithStats]);
@@ -408,6 +438,37 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
     return allStats.reduce((sum, h) => sum + h.completionRate, 0) / allStats.length;
   }, [getAllHabitsWithStats]);
 
+  const uploadAvatar = useCallback(async (file: File): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'No user' };
+
+    const fileExt = file.name.split('.').pop();
+    const filePath = `${user.id}/${Math.random()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      return { error: uploadError.message };
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(filePath);
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ avatar_url: publicUrl })
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      return { error: updateError.message };
+    }
+
+    setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null);
+    return { error: null };
+  }, [user]);
+
   return (
     <HabitContext.Provider value={{
       user,
@@ -417,9 +478,11 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
       logs,
       isAuthenticated: !!session,
       isLoading,
+      isAppExiting,
       login,
       logout,
       register,
+      updateProfile,
       addHabit,
       updateHabit,
       deleteHabit,
@@ -430,6 +493,7 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
       getCategoryStats,
       getTotalStreak,
       getCompletionRate,
+      uploadAvatar,
     }}>
       {children}
     </HabitContext.Provider>

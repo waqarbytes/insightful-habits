@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, Calendar, Target, Flame, TrendingUp, Settings, Bell, Moon, LogOut } from 'lucide-react';
+import { User, Mail, Calendar, Target, Flame, TrendingUp, Settings, Bell, LogOut, Camera, Loader2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,22 +10,85 @@ import { useHabits } from '@/context/HabitContext';
 import { StreakIndicator } from '@/components/habits/StreakIndicator';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { useTranslation } from 'react-i18next';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export default function Profile() {
-  const { user, profile, logout, getAllHabitsWithStats, getCompletionRate, getTotalStreak, habits, logs } = useHabits();
-  const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
+  const { user, profile, logout, getAllHabitsWithStats, getCompletionRate, getTotalStreak, habits, logs, uploadAvatar, updateProfile } = useHabits();
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation();
 
   const habitsWithStats = getAllHabitsWithStats();
   const completionRate = getCompletionRate();
   const streak = getTotalStreak();
   const totalLogsCount = logs.length;
 
+  const handleNotificationToggle = async (checked: boolean) => {
+    if (checked) {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        toast({
+          title: "Permission denied",
+          description: "Please enable notifications in your browser settings",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    updateProfile({ notifications_enabled: checked });
+    toast({
+      title: checked ? "Notifications enabled" : "Notifications disabled",
+      description: checked ? "We'll remind you to track your habits" : "You won't receive daily reminders",
+    });
+  };
+
   const handleSaveSettings = () => {
     toast({
-      title: "Settings saved",
-      description: "Your preferences have been updated.",
+      title: t('profile.settings_saved'),
+      description: t('profile.settings_saved_desc'),
     });
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: t('profile.invalid_file_type'),
+        description: t('profile.invalid_file_type_desc'),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) { // 2MB
+      toast({
+        title: t('profile.file_too_large'),
+        description: t('profile.file_too_large_desc'),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    const { error } = await uploadAvatar(file);
+    setIsUploading(false);
+
+    if (error) {
+      toast({
+        title: t('profile.upload_failed'),
+        description: error,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: t('profile.profile_updated'),
+        description: t('profile.profile_updated_desc'),
+      });
+    }
   };
 
   return (
@@ -37,9 +100,9 @@ export default function Profile() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Profile</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">{t('profile.title')}</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your account and preferences
+            {t('profile.subtitle')}
           </p>
         </motion.div>
 
@@ -51,16 +114,43 @@ export default function Profile() {
             className="card-elevated p-6"
           >
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-              <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <User className="h-10 w-10 text-primary" />
+              <div
+                className="relative group w-24 h-24 rounded-2xl bg-primary/10 flex items-center justify-center overflow-visible cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt={profile.name || "User"} className="w-full h-full rounded-2xl object-cover" />
+                ) : (
+                  <User className="h-10 w-10 text-primary" />
+                )}
+
+                {/* Overlay */}
+                <div className="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Camera className="h-6 w-6 text-white" />
+                </div>
+
+                {/* Loading State */}
+                {isUploading && (
+                  <div className="absolute inset-0 bg-background/80 rounded-2xl flex items-center justify-center z-10">
+                    <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                  </div>
+                )}
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
               </div>
-              
+
               <div className="flex-1">
                 <h2 className="text-xl font-bold text-foreground">{profile?.name || user?.email?.split('@')[0]}</h2>
                 <p className="text-muted-foreground">{user?.email}</p>
                 <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4" />
-                  <span>Joined {user?.created_at ? format(new Date(user.created_at), 'MMMM yyyy') : 'recently'}</span>
+                  <span>{t('profile.joined')} {user?.created_at ? format(new Date(user.created_at), 'MMMM yyyy') : 'recently'}</span>
                 </div>
               </div>
 
@@ -80,7 +170,7 @@ export default function Profile() {
                 <Target className="h-6 w-6 text-primary" />
               </div>
               <p className="text-2xl font-bold text-foreground">{habits.length}</p>
-              <p className="text-sm text-muted-foreground">Active Habits</p>
+              <p className="text-sm text-muted-foreground">{t('profile.active_habits')}</p>
             </div>
 
             <div className="card-elevated p-5 text-center">
@@ -88,7 +178,7 @@ export default function Profile() {
                 <Flame className="h-6 w-6 text-accent" />
               </div>
               <p className="text-2xl font-bold text-foreground">{totalLogsCount}</p>
-              <p className="text-sm text-muted-foreground">Total Logs</p>
+              <p className="text-sm text-muted-foreground">{t('profile.total_logs')}</p>
             </div>
 
             <div className="card-elevated p-5 text-center">
@@ -96,7 +186,7 @@ export default function Profile() {
                 <TrendingUp className="h-6 w-6 text-success" />
               </div>
               <p className="text-2xl font-bold text-foreground">{Math.round(completionRate)}%</p>
-              <p className="text-sm text-muted-foreground">Success Rate</p>
+              <p className="text-sm text-muted-foreground">{t('profile.success_rate')}</p>
             </div>
           </motion.div>
 
@@ -109,54 +199,51 @@ export default function Profile() {
           >
             <div className="flex items-center gap-3 mb-6">
               <Settings className="h-5 w-5 text-muted-foreground" />
-              <h3 className="text-lg font-semibold text-foreground">Account Settings</h3>
+              <h3 className="text-lg font-semibold text-foreground">{t('profile.account_settings')}</h3>
             </div>
 
             <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
+                  <Label htmlFor="name">{t('profile.name')}</Label>
                   <Input id="name" defaultValue={profile?.name || ''} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">{t('profile.email')}</Label>
                   <Input id="email" type="email" defaultValue={user?.email} />
                 </div>
               </div>
 
               <div className="border-t border-border pt-6 space-y-4">
+                {/* Language Switcher */}
+                <LanguageSwitcher />
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Bell className="h-5 w-5 text-muted-foreground" />
                     <div>
-                      <p className="font-medium text-foreground">Notifications</p>
-                      <p className="text-sm text-muted-foreground">Receive reminders for your habits</p>
+                      <p className="font-medium text-foreground">{t('profile.notifications')}</p>
+                      <p className="text-sm text-muted-foreground">{t('profile.notifications_desc')}</p>
                     </div>
                   </div>
-                  <Switch checked={notifications} onCheckedChange={setNotifications} />
+                  <Switch
+                    checked={profile?.notifications_enabled || false}
+                    onCheckedChange={handleNotificationToggle}
+                  />
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Moon className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium text-foreground">Dark Mode</p>
-                      <p className="text-sm text-muted-foreground">Use dark theme</p>
-                    </div>
-                  </div>
-                  <Switch checked={darkMode} onCheckedChange={setDarkMode} />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <Button variant="outline" onClick={() => toast({ title: "No changes to discard" })}>
-                  Cancel
-                </Button>
-                <Button className="btn-gradient" onClick={handleSaveSettings}>
-                  Save Changes
-                </Button>
               </div>
             </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="outline" onClick={() => toast({ title: "No changes to discard" })}>
+                {t('profile.cancel')}
+              </Button>
+              <Button className="btn-gradient" onClick={handleSaveSettings}>
+                {t('profile.save_changes')}
+              </Button>
+            </div>
+
           </motion.div>
 
           {/* Danger Zone */}
@@ -166,22 +253,22 @@ export default function Profile() {
             transition={{ delay: 0.3 }}
             className="card-elevated p-6 border-destructive/30"
           >
-            <h3 className="text-lg font-semibold text-foreground mb-4">Danger Zone</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">{t('profile.danger_zone')}</h3>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <p className="font-medium text-foreground">Sign out of your account</p>
+                <p className="font-medium text-foreground">{t('profile.sign_out_title')}</p>
                 <p className="text-sm text-muted-foreground">
-                  You'll need to sign in again to access your habits
+                  {t('profile.sign_out_desc')}
                 </p>
               </div>
               <Button variant="destructive" onClick={logout}>
                 <LogOut className="mr-2 h-4 w-4" />
-                Sign out
+                {t('sidebar.sign_out')}
               </Button>
             </div>
           </motion.div>
         </div>
-      </div>
-    </AppLayout>
+      </div >
+    </AppLayout >
   );
 }

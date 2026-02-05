@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  LayoutDashboard, 
-  Target, 
-  BarChart3, 
+import {
+  LayoutDashboard,
+  Target,
+  BarChart3,
   User,
   ChevronLeft,
   ChevronRight,
@@ -16,19 +16,21 @@ import { cn } from '@/lib/utils';
 import { useHabits } from '@/context/HabitContext';
 import { Button } from '@/components/ui/button';
 import { StreakIndicator } from '@/components/habits/StreakIndicator';
-
-const navItems = [
-  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/habits', icon: Target, label: 'My Habits' },
-  { path: '/analytics', icon: BarChart3, label: 'Analytics' },
-  { path: '/profile', icon: User, label: 'Profile' },
-];
+import { useTranslation } from 'react-i18next';
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const { user, profile, logout, getTotalStreak } = useHabits();
   const streak = getTotalStreak();
+  const { t } = useTranslation();
+
+  const navItems = [
+    { path: '/dashboard', icon: LayoutDashboard, label: t('sidebar.dashboard') },
+    { path: '/habits', icon: Target, label: t('sidebar.my_habits') },
+    { path: '/analytics', icon: BarChart3, label: t('sidebar.analytics') },
+    { path: '/profile', icon: User, label: t('sidebar.profile') },
+  ];
 
   return (
     <motion.aside
@@ -50,8 +52,8 @@ export function Sidebar() {
                 <Flame className="h-5 w-5 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="font-bold text-foreground">HabitFlow</h1>
-                <p className="text-xs text-muted-foreground">Track your progress</p>
+                <h1 className="font-bold text-foreground">{t('app_name')}</h1>
+                <p className="text-xs text-muted-foreground">{t('tagline')}</p>
               </div>
             </motion.div>
           )}
@@ -121,7 +123,7 @@ export function Sidebar() {
           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
             <User className="h-5 w-5 text-primary" />
           </div>
-          
+
           <AnimatePresence mode="wait">
             {!collapsed && user && (
               <motion.div
@@ -144,7 +146,7 @@ export function Sidebar() {
             onClick={logout}
           >
             <LogOut className="mr-2 h-4 w-4" />
-            Sign out
+            {t('sidebar.sign_out')}
           </Button>
         )}
       </div>

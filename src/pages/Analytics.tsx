@@ -7,12 +7,14 @@ import { CompletionRing } from '@/components/analytics/CompletionRing';
 import { StreakIndicator } from '@/components/habits/StreakIndicator';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { useHabits } from '@/context/HabitContext';
+import { useTranslation } from 'react-i18next';
 
 export default function Analytics() {
   const { getAllHabitsWithStats, getCompletionRate, getTotalStreak, habits } = useHabits();
   const habitsWithStats = getAllHabitsWithStats();
   const completionRate = getCompletionRate();
   const streak = getTotalStreak();
+  const { t } = useTranslation();
 
   const longestStreak = Math.max(...habitsWithStats.map(h => h.longestStreak), 0);
   const averageWeeklyProgress = habitsWithStats.length > 0
@@ -32,24 +34,24 @@ export default function Analytics() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Analytics</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">{t('analytics.title')}</h1>
           <p className="text-muted-foreground mt-1">
-            Visualize your progress and identify patterns
+            {t('analytics.subtitle')}
           </p>
         </motion.div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatsCard
-            title="Completion Rate"
+            title={t('analytics.completion')}
             value={`${Math.round(completionRate)}%`}
-            subtitle="Overall average"
+            subtitle={t('dashboard.overall_average')}
             icon={TrendingUp}
             color="primary"
             delay={0}
           />
           <StatsCard
-            title="Current Streak"
+            title={t('dashboard.current_streak')}
             value={`${streak} days`}
             subtitle="Keep it up!"
             icon={Flame}
@@ -57,17 +59,17 @@ export default function Analytics() {
             delay={0.1}
           />
           <StatsCard
-            title="Longest Streak"
+            title={t('analytics.longest_streak')}
             value={`${longestStreak} days`}
-            subtitle="Personal best"
+            subtitle={t('analytics.personal_best')}
             icon={Award}
             color="warning"
             delay={0.2}
           />
           <StatsCard
-            title="Active Habits"
+            title={t('analytics.active_habits')}
             value={habits.length}
-            subtitle="Being tracked"
+            subtitle={t('analytics.being_tracked')}
             icon={Target}
             color="success"
             delay={0.3}
@@ -89,18 +91,18 @@ export default function Analytics() {
             transition={{ delay: 0.2 }}
             className="card-elevated p-6"
           >
-            <h3 className="text-lg font-semibold text-foreground mb-6">Progress Overview</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-6">{t('analytics.progress_overview')}</h3>
             <div className="flex items-center justify-around">
               <CompletionRing
                 percentage={completionRate}
-                label="Overall"
-                sublabel="Completion"
+                label={t('analytics.overall')}
+                sublabel={t('analytics.completion')}
                 size="lg"
               />
               <CompletionRing
                 percentage={averageWeeklyProgress}
-                label="This Week"
-                sublabel="Progress"
+                label={t('analytics.this_week')}
+                sublabel={t('analytics.progress')}
                 size="lg"
                 color="hsl(var(--accent))"
               />
@@ -114,17 +116,16 @@ export default function Analytics() {
             transition={{ delay: 0.3 }}
             className="card-elevated p-6"
           >
-            <h3 className="text-lg font-semibold text-foreground mb-4">Top Performing Habits</h3>
-            
+            <h3 className="text-lg font-semibold text-foreground mb-4">{t('analytics.top_performing_habits')}</h3>
+
             {topHabits.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">No habits yet</p>
+              <p className="text-muted-foreground text-center py-8">{t('dashboard.no_habits_yet')}</p>
             ) : (
               <div className="space-y-4">
                 {topHabits.map((habit, index) => (
                   <div key={habit.id} className="flex items-center gap-4">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      index === 0 ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground'
-                    }`}>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${index === 0 ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground'
+                      }`}>
                       {index + 1}
                     </span>
                     <div className="flex-1 min-w-0">

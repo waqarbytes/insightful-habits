@@ -16,28 +16,30 @@ import {
 import { useHabits } from '@/context/HabitContext';
 import { HabitCategory } from '@/types/habit';
 import { cn } from '@/lib/utils';
-
-const categories = [
-  { value: 'all', label: 'All Categories' },
-  { value: 'health', label: 'Health' },
-  { value: 'fitness', label: 'Fitness' },
-  { value: 'mindfulness', label: 'Mindfulness' },
-  { value: 'productivity', label: 'Productivity' },
-  { value: 'learning', label: 'Learning' },
-  { value: 'social', label: 'Social' },
-];
+import { useTranslation } from 'react-i18next';
 
 export default function Habits() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
-  
+  const { t } = useTranslation();
+
   const { getAllHabitsWithStats } = useHabits();
   const habits = getAllHabitsWithStats();
 
+  const categories = [
+    { value: 'all', label: t('habits.all_categories') },
+    { value: 'health', label: t('habits.health') },
+    { value: 'fitness', label: t('habits.fitness') },
+    { value: 'mindfulness', label: t('habits.mindfulness') },
+    { value: 'productivity', label: t('habits.productivity') },
+    { value: 'learning', label: t('habits.learning') },
+    { value: 'social', label: t('habits.social') },
+  ];
+
   const filteredHabits = habits.filter(habit => {
     const matchesSearch = habit.name.toLowerCase().includes(search.toLowerCase()) ||
-                          habit.description?.toLowerCase().includes(search.toLowerCase());
+      habit.description?.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = category === 'all' || habit.category === category;
     return matchesSearch && matchesCategory;
   });
@@ -52,12 +54,12 @@ export default function Habits() {
           className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8"
         >
           <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-foreground">My Habits</h1>
+            <h1 className="text-2xl lg:text-3xl font-bold text-foreground">{t('habits.title')}</h1>
             <p className="text-muted-foreground mt-1">
-              Manage and track all your habits in one place
+              {t('habits.subtitle')}
             </p>
           </div>
-          
+
           <AddHabitDialog />
         </motion.div>
 
@@ -71,7 +73,7 @@ export default function Habits() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search habits..."
+              placeholder={t('habits.search_placeholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-10"
@@ -122,9 +124,9 @@ export default function Habits() {
             className="card-elevated p-12 text-center"
           >
             <p className="text-muted-foreground">
-              {habits.length === 0 
-                ? "You haven't created any habits yet"
-                : "No habits match your search criteria"
+              {habits.length === 0
+                ? t('habits.no_habits_created')
+                : t('habits.no_habits_match')
               }
             </p>
           </motion.div>

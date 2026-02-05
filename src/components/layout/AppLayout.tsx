@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
+import { MobileNav } from './MobileNav';
 import { useHabits } from '@/context/HabitContext';
 import { Navigate } from 'react-router-dom';
 import { ModeToggle } from '../mode-toggle';
@@ -17,13 +18,18 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="flex min-h-screen w-full bg-background">
-      <Sidebar />
-      <main className="flex-1 overflow-x-hidden relative">
+      <div className="hidden md:flex h-screen sticky top-0">
+        <Sidebar />
+      </div>
+
+      <main className="flex-1 w-full overflow-x-hidden relative pb-16 md:pb-0">
         <div className="absolute top-4 right-4 z-50">
           <ModeToggle />
         </div>
         {children}
       </main>
+
+      <MobileNav />
     </div>
   );
 }
