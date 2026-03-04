@@ -12,9 +12,20 @@ import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function Profile() {
-  const { user, profile, logout, getAllHabitsWithStats, getCompletionRate, getTotalStreak, habits, logs, uploadAvatar, updateProfile } = useHabits();
+  const { user, profile, logout, getAllHabitsWithStats, getCompletionRate, getTotalStreak, habits, logs, uploadAvatar, updateProfile, deleteAccount } = useHabits();
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { t } = useTranslation();
@@ -261,10 +272,41 @@ export default function Profile() {
                   {t('profile.sign_out_desc')}
                 </p>
               </div>
-              <Button variant="destructive" onClick={logout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                {t('sidebar.sign_out')}
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Delete Account
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete your account
+                      and remove your data from our servers.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={async () => {
+                        const { error } = await deleteAccount();
+                        if (error) {
+                          toast({
+                            title: "Error deleting account",
+                            description: error,
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete Account
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </motion.div>
         </div>

@@ -39,7 +39,9 @@ interface HabitContextType {
   getCategoryStats: () => CategoryStats[];
   getTotalStreak: () => number;
   getCompletionRate: () => number;
+  getCompletionRateTrend: () => { value: number; positive: boolean };
   uploadAvatar: (file: File) => Promise<{ error: string | null }>;
+  deleteAccount: () => Promise<{ error: string | null }>;
 }
 
 const HabitContext = createContext<HabitContextType | undefined>(undefined);
@@ -438,6 +440,52 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
     return allStats.reduce((sum, h) => sum + h.completionRate, 0) / allStats.length;
   }, [getAllHabitsWithStats]);
 
+  const getCompletionRateTrend = useCallback((): { value: number; positive: boolean } => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const calculatePeriodRate = (startDate: Date, days: number) => {
+      let totalWeightedRate = 0;
+      let count = 0;
+
+      for (let i = 0; i < days; i++) {
+        const date = new Date(startDate);
+        date.setDate(date.getDate() - i);
+        const dayString = date.toDateString();
+
+        // Active habits on this date (created before or on this date)
+        const activeHabits = habits.filter(h => new Date(h.createdAt) <= date);
+        if (activeHabits.length === 0) continue;
+
+        const completedCount = activeHabits.filter(h => {
+          const log = logs.find(l =>
+            l.habitId === h.id &&
+            new Date(l.date).toDateString() === dayString
+          );
+          return log && log.value >= h.target;
+        }).length;
+
+        totalWeightedRate += (completedCount / activeHabits.length);
+        count++;
+      }
+
+      return count > 0 ? (totalWeightedRate / count) * 100 : 0;
+    };
+
+    const currentWeekRate = calculatePeriodRate(today, 7);
+
+    const lastWeekEnd = new Date(today);
+    lastWeekEnd.setDate(lastWeekEnd.getDate() - 7);
+    const lastWeekRate = calculatePeriodRate(lastWeekEnd, 7);
+
+    const diff = currentWeekRate - lastWeekRate;
+
+    return {
+      value: Number(Math.abs(diff).toFixed(1)),
+      positive: diff >= 0
+    };
+  }, [habits, logs]);
+
   const uploadAvatar = useCallback(async (file: File): Promise<{ error: string | null }> => {
     if (!user) return { error: 'No user' };
 
@@ -469,6 +517,29 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   }, [user]);
 
+  const deleteAccount = useCallback(async (): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'No user' };
+
+    // Note: This requires a matching RPC function 'delete_user' in Supabase
+    // or enabling user self-deletion policy. 
+    // For now, we'll try an RPC call, and if it fails, we'll guide the user.
+    try {
+      const { error } = await supabase.rpc('delete_user' as any);
+
+      if (error) {
+        // Fallback: If RPC doesn't exist, we might try to delete profile manually if RLS allows
+        // But usually auth user deletion requires admin or RPC.
+        console.error("Account deletion failed:", error);
+        return { error: "Unable to delete account automatically. Please contact support." };
+      }
+
+      await logout();
+      return { error: null };
+    } catch (e) {
+      return { error: (e as Error).message };
+    }
+  }, [user, logout]);
+
   return (
     <HabitContext.Provider value={{
       user,
@@ -493,7 +564,9 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
       getCategoryStats,
       getTotalStreak,
       getCompletionRate,
+      getCompletionRateTrend,
       uploadAvatar,
+      deleteAccount,
     }}>
       {children}
     </HabitContext.Provider>

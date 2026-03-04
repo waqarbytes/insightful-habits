@@ -12,6 +12,7 @@ import Habits from "./pages/Habits";
 import Analytics from "./pages/Analytics";
 import Profile from "./pages/Profile";
 import Onboarding from "./pages/Onboarding";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 import { SplashScreen } from "@/components/layout/SplashScreen";
@@ -79,6 +80,7 @@ const AppContent = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<Login />} />
         <Route path="/onboarding" element={user ? <Onboarding /> : <Navigate to="/login" />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
 
         <Route
           path="/dashboard"

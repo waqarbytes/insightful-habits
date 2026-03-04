@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">InsightfulHabits</string>
+    <string name="title_activity_main">InsightfulHabits</string>
+    <string name="package_name">com.insightfulhabits.app</string>
+    <string name="custom_url_scheme">com.insightfulhabits.app</string>
+</resources>

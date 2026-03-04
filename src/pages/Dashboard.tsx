@@ -10,10 +10,11 @@ import { useHabits } from '@/context/HabitContext';
 import { useTranslation } from 'react-i18next';
 
 export default function Dashboard() {
-  const { user, profile, getAllHabitsWithStats, getTotalStreak, getCompletionRate, habits } = useHabits();
+  const { user, profile, getAllHabitsWithStats, getTotalStreak, getCompletionRate, getCompletionRateTrend, habits } = useHabits();
   const habitsWithStats = getAllHabitsWithStats();
   const streak = getTotalStreak();
   const completionRate = getCompletionRate();
+  const completionRateTrend = getCompletionRateTrend();
   const { t } = useTranslation();
 
   const todayCompleted = habitsWithStats.filter(h => h.todayValue >= h.target).length;
@@ -64,7 +65,7 @@ export default function Dashboard() {
             subtitle={t('dashboard.overall_average')}
             icon={TrendingUp}
             color="success"
-            trend={{ value: 5, positive: true }}
+            trend={completionRateTrend}
             delay={0.2}
           />
           <StatsCard
